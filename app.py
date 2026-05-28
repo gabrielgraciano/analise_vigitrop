@@ -153,15 +153,16 @@ with aba_analises:
 # --- ABA 2: MAPA DE CALOR ---
 # --- CONTEÚDO DA ABA MAPA ---
 # --- CONTEÚDO DA ABA MAPA ---
+# --- ABA 2: MAPA DE CALOR ---
 with aba_mapa:
     if uf_selecionada == 'Todas':
         st.info("🗺️ Selecione um Estado (UF) específico no filtro lateral para gerar o mapa. A renderização simultânea de todo o território nacional excede o limite de memória.")
     elif not df_filtrado.empty:
         st.subheader(f"Mapa de Calor de Acidentes - {uf_selecionada} (Escala Logarítmica)")
         
-        # 1. Agrega os dados em nível municipal
+        # 1. Agrega os dados em nível municipal mantendo o nome do município
         df_mapa = (
-            df_filtrado.groupby('cod_municipio', observed=False)
+            df_filtrado.groupby(['cod_municipio', 'Município'], observed=False)
             .size()
             .reset_index(name='Casos')
         )
@@ -169,7 +170,8 @@ with aba_mapa:
         # Garante que a chave é string limpa
         df_mapa['cod_municipio'] = df_mapa['cod_municipio'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
         
-        # Cria a escala logarítmica (base 10) para definir as cores
+        # Cria a escala logarítmica (base 10) para achatar distorções
+        import numpy as np
         df_mapa['Log_Casos'] = np.log10(df_mapa['Casos'])
         
         # 2. Criação do mapa
@@ -178,11 +180,14 @@ with aba_mapa:
             geojson=geojson_brasil, 
             locations='cod_municipio',
             featureidkey='properties.id',
-            color='Log_Casos', # Utiliza a coluna logarítmica para a cor
+            color='Log_Casos', 
             color_continuous_scale="Reds",
-            hover_name='cod_municipio',
-            # Oculta o valor do Log na caixa de texto e exibe apenas os Casos Reais
-            hover_data={'Log_Casos': False, 'Casos': True}
+            hover_name='Município', # Exibe o nome do município em destaque
+            hover_data={
+                'cod_municipio': False, # Oculta o código IBGE
+                'Log_Casos': False,     # Oculta o valor logarítmico
+                'Casos': True           # Exibe os casos absolutos reais
+            }
         )
         
         # 3. Ajustes visuais
@@ -196,7 +201,6 @@ with aba_mapa:
             margin={"r":0,"t":0,"l":0,"b":0},
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)',
-            # Renomeia a legenda para o usuário entender a transformação
             coloraxis_colorbar=dict(title="Log10(Casos)")
         )
         
